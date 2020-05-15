@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <style>
+      .item1 {
+        grid-area: header;
+      }
+      .item3 {
+        grid-area: left;
+      }
+      .item4 {
+        grid-area: right;
+      }
+      .item5 {
+        grid-area: footer;
+      }
+      .thumb-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+        background-color: #2196f3;
+        padding: 5px;
+      }
+      .thumb-item {
+        background-color: rgba(255, 255, 255, 0.8);
+        border: 1px solid rgba(0, 0, 0, 0.8);
+        padding: 20px;
+        font-size: 30px;
+        text-align: center;
+      }
+      .grid-container {
+        display: grid;
+        grid-template-areas:
+          "header header header header header header"
+          "left right right right right right"
+          "footer footer footer footer footer footer";
+        grid-gap: 10px;
+        background-color: #2196f3;
+        padding: 10px;
+      }
+
+      .grid-container > div {
+        background-color: rgba(255, 255, 255, 0.8);
+        text-align: center;
+        padding: 0px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="grid-container">
+      <div class="item1">
+        <h1>Tile Mapper</h1>
+      </div>
+      <div class="item3">
+        <div class="thumb-container">
+          <div class="thumb-item">
+            <img id="primaryTileImg" src="test.png" /> -> <img id="secondaryTileImg" src="test.png" /> <br />
+            <button onclick="mergeTiles()">Merge</button>
+          </div>
+          <div class="thumb-item"><button onclick=" getTiles()">Rebuild</button></div>
+          <div class="thumb-item"><button onclick="showHideGrid()">Show/Hide Grid</button></div>
+          <div class="thumb-item">
+            <a id="download" download="tilesheet.png">
+              <button type="button" onClick="download()">Download</button>
+            </a>
+          </div>
+          <div class="thumb-item">7</div>
+          <div class="thumb-item">8</div>
+          <div class="thumb-item">9</div>
+        </div>
+      </div>
+      <div class="item4"><canvas id="canvas" width="800" height="600"></canvas></div>
+      <div id="tileDiv" class="item5">
+        <div id="tileDiv" style="width: 800px; overflow: scroll;"><canvas id="tileSheetCanvas" width="800" height="64"></canvas></div>
+        <div id="mapCSVDiv">
+          <textarea style="width: 800px; height: 100px;" id="mapCSV"></textarea>
+        </div>
+      </div>
+    </div>
+    <script>
+      const tileWidth = 64;
+      const tileHeight = 64;
+      const tileDiv = document.getElementById("tileDiv");
+      const csvTextBox = document.getElementById("mapCSV");
+      const primaryTileImg = document.getElementById("primaryTileImg");
+      const secondaryTileImg = document.getElementById("secondaryTileImg");
+      let primaryMapIdx = null;
+      let secondaryMapIdx = [];
+      let controlKeyDown = false;
+      let showGrid = false;
+      let tiles = [];
+      let csv = [];
+      let img = new Image();
+      const canvasMain = document.getElementById("canvas");
+      const tileSheetCanvas = document.getElementById("tileSheetCanvas");
+      const tileSheetCtx = tileSheetCanvas.getContext("2d");
+
+      function download() {
+        let download = document.getElementById("download");
+        let image = tileSheetCanvas.toDataURL("image/png").replace("image/png", "image/octet-stream");
+        download.setAttribute("href", image);
+        //download.setAttribute("download","archive.png");
+        downloadText();
+      }
+
+      function downloadText() {
+        var text = document.getElementById("mapCSV").value;
+        text = text.replace(/\n/g, "\r\n"); // To retain the Line breaks.
+        var blob = new Blob([text], { type: "text/plain" });
+        var anchor = document.createElement("a");
+        anchor.download = "tilemap.txt";
+        anchor.href = window.URL.createObjectURL(blob);
+        anchor.target = "_blank";
+        anchor.style.display = "none"; // just to be safe!
+        document.body.appendChild(anchor);
+        anchor.click();
+        document.body.removeChild(anchor);
+      }
+
+      function showHideGrid() {
+        showGrid = !showGrid;
+        if (showGrid) {
+          drawGrid();
+        } else {
+          rebuildImage();
+        }
+      }
+
+      function clearSelectedTiles() {
+        primaryMapIdx = null;
+        secondaryMapIdx = [];
+      }
+      function mergeTiles() {
+        if (primaryMapIdx != null && secondaryMapIdx.length > 0) {
+          for (let i = 0; i < secondaryMapIdx.length; i++) {
+            if (secondaryMapIdx[i] === null) continue;
+            let primaryTileIdx = csv[primaryMapIdx];
+            let secondaryTileIdx = csv[secondaryMapIdx[i]];
+            console.log(primaryTileIdx, " merging into ", secondaryTileIdx);
+            if (primaryTileIdx == secondaryTileIdx) {
+              console.log("Cant merge both tiles are the same: p", primaryTileIdx, "s: " + secondaryTileIdx);
+              //clearSelectedTiles();
+              continue;
+            }
+            //loop through the whole of the csv and change the secondary tile to the primary tile
+            for (let idx = 0; idx < csv.length; idx++) {
+              if (csv[idx] == secondaryTileIdx) {
+                console.log("changing", csv[idx], "to", primaryTileIdx);
+                csv[idx] = primaryTileIdx;
+                //update the view
+                drawTile(idx);
+              }
+            }
+            //Remove from tile map
+            tiles[secondaryTileIdx[i]] = null;
+          }
+          clearSelectedTiles();
+          //Need to remove all nulls from tile map
+        }
+      }
+
+      function getCursorPosition(canvas, event) {
+        const rect = canvasMain.getBoundingClientRect();
+        const x = event.clientX - rect.left;
+        const y = event.clientY - rect.top;
+        console.log("x: " + x + " y: " + y);
+        let mapIdx = getMapIdxFromXY(x, y);
+        if (csv.length > 0) {
+          let tileIdx = csv[mapIdx];
+
+          //check to see if the tile has already been selected if so unselect
+          if (mapIdx === primaryMapIdx) {
+            drawSelectedTiles(primaryMapIdx, "black");
+            primaryMapIdx = null;
+            primaryTileImg.src = tiles[0].image.src; //need to change this to a blank image
+            return;
+          }
+
+          if (secondaryMapIdx.indexOf(mapIdx) != -1 || (!controlKeyDown && secondaryMapIdx.length > 0)) {
+            let foundIdx = secondaryMapIdx.indexOf(mapIdx);
+            drawSelectedTiles(secondaryMapIdx.indexOf(foundIdx), "black");
+            secondaryMapIdx[foundIdx] = null;
+            secondaryTileImg.src = tiles[0].image.src; //need to change this to a blank image
+            return;
+          }
+
+          //select the tile if it hasn't already been selected
+          if (primaryMapIdx === null || (primaryMapIdx !== null) & !controlKeyDown) {
+            if (primaryMapIdx !== null) drawSelectedTiles(primaryMapIdx, "black");
+            primaryMapIdx = mapIdx;
+            primaryTileImg.src = tiles[csv[mapIdx]].image.src;
+            drawSelectedTiles(primaryMapIdx, "red");
+            return;
+          }
+
+          if (controlKeyDown) {
+            secondaryMapIdx.push(mapIdx);
+            secondaryTileImg.src = tiles[csv[mapIdx]].image.src;
+            drawSelectedTiles(mapIdx, "green");
+            return;
+          }
+        } else {
+          alert("no csv creaded yet");
+        }
+      }
+
+      function getMapIdxFromXY(x, y) {
+        const idxX = Math.floor(x / tileWidth);
+        const idxY = Math.floor(y / tileHeight);
+        console.log(idxX, idxY);
+        //work out the array index by using index = xMousePos + width * yMousePos;
+        //Make sure we ceilling the image width / tile width as our image may not be divisable by the tiles
+        const idx = Math.floor(idxX + Math.ceil(img.width / tileWidth) * idxY);
+        console.log("idx", idx);
+        return idx;
+      }
+
+      function drawSelectedTiles(mapIdx, color) {
+        let coord = getXYFromMapIdx(mapIdx);
+        ctxMain.beginPath();
+        ctxMain.rect(coord.x, coord.y, tileWidth, tileHeight);
+        ctxMain.strokeStyle = color;
+        ctxMain.stroke();
+      }
+
+      canvasMain.addEventListener("mousedown", function (e) {
+        getCursorPosition(canvasMain, e);
+        console.log("primary tile: " + primaryMapIdx, "secondary tile: " + secondaryMapIdx);
+      });
+
+      document.addEventListener("keydown", (e) => {
+        console.log(e.key);
+        controlKeyDown = e.key == "Control";
+      });
+
+      document.addEventListener("keyup", (e) => {
+        controlKeyDown = !(e.key == "Control");
+      });
+
+      const ctxMain = canvas.getContext("2d");
+      const clippingCanvas = document.createElement("canvas");
+      clippingCanvas.width = tileWidth;
+      clippingCanvas.height = tileHeight;
+
+      const clippingCtx = clippingCanvas.getContext("2d");
+
+      img.src = "./image/g4506.png";
+      img.onload = () => {
+        canvasMain.width = img.width;
+        canvasMain.height = img.height;
+        ctxMain.drawImage(img, 0, 0, img.width, img.height);
+        setTimeout(getTiles, 1000);
+      };
+
+      function getBase64Image(img) {
+        // Create an empty canvas element
+        let canvas = document.createElement("canvas");
+        canvas.width = img.width;
+        canvas.height = img.height;
+
+        // Copy the image contents to the canvas
+        let ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0);
+
+        // Get the data-URL formatted image
+        // Firefox supports PNG and JPEG. You could check img.src to
+        // guess the original format, but be aware the using "image/jpg"
+        // will re-encode the image.
+        let dataURL = canvas.toDataURL("image/png");
+
+        return dataURL.replace(/^data:image\/(png|jpg);base64,/, "");
+      }
+
+      function clearClipArea() {
+        clippingCtx.clearRect(0, 0, canvasMain.width, canvasMain.height);
+      }
+
+      function wait(ms) {
+        var start = new Date().getTime();
+        var end = start;
+        while (end < start + ms) {
+          end = new Date().getTime();
+        }
+      }
+
+      const loadImage = async (imageUrl) => await getImage(imageUrl);
+
+      const getImage = (imageUrl) => {
+        return new Promise((resolve, reject) => {
+          let img = new Image();
+          img.onload = () => resolve(img);
+          img.onerror = reject;
+          img.src = imageUrl;
+        });
+      };
+
+      const getImageDataUrl = (inCanvas) => {
+        return new Promise((resolve, reject) => {
+          let newImage = document.createElement("img");
+          newImage.onload = () => resolve(newImage);
+          newImage.onerror = reject;
+          newImage.src = inCanvas.toDataURL();
+        });
+      };
+
+      async function clipImageToTile(x, y) {
+        clippingCtx.drawImage(canvasMain, x, y, tileWidth, tileHeight, 0, 0, tileWidth, tileHeight);
+        let newImage = await getImageDataUrl(clippingCanvas);
+        let base64 = getBase64Image(newImage);
+        let len = tiles.length;
+        let match = false;
+        let idx = 0;
+        if (len > 0) {
+          for (idx = 0; idx < len; idx++) {
+            match = base64 == tiles[idx].base64;
+            if (match) break;
+          }
+        }
+
+        if (!match) {
+          tiles.push({ image: newImage, base64: base64 });
+          // tileDiv.appendChild(newImage);
+          // document.getElementById('tileDiv').appendChild(newImage);
+          return idx++;
+        } else {
+          return idx;
+        }
+      }
+
+      async function getTiles() {
+        showGrid = false;
+        //Check to see if we have anything in the csv, if so paint content first
+        if (csv.length > 0) {
+          rebuildImage();
+          csv = [];
+          tiles = [];
+        }
+
+        let idx = 0;
+        for (let y = 0; y < img.height; y += tileHeight) {
+          // let csvLine = "";
+          for (let x = 0; x < img.width; x += tileWidth) {
+            clearClipArea();
+            let tileIdx = await clipImageToTile(x, y);
+            csv.push(tileIdx);
+            idx++;
+          }
+        }
+        csvTextBox.value = csv;
+
+        //Build the tile sheets
+        tileSheetCanvas.width = tileWidth * tiles.length;
+        tileSheetCanvas.height = tileHeight;
+        tileSheetCtx.clearRect(0, 0, tileSheetCanvas.width, tileSheetCanvas.height);
+        let x = 0;
+        for (let tileImage of tiles) {
+          tileSheetCtx.drawImage(tileImage.image, x, 0);
+          x += tileWidth;
+        }
+        console.log("Complete tile update");
+      }
+
+      function drawGrid() {
+        let mapIdx = 0;
+        ctxMain.fillStyle = "black";
+        ctxMain.beginPath();
+        for (let y = 0; y < img.height; y += tileHeight) {
+          for (let x = 0; x < img.width; x += tileWidth) {
+            let tileIdx = csv[mapIdx];
+            ctxMain.fillText(tileIdx, x + 10, y + 10);
+            ctxMain.fillText(mapIdx, x + tileWidth / 2, y + tileHeight / 2);
+            ctxMain.rect(x, y, tileWidth, tileHeight);
+            csv.push(tileIdx);
+            mapIdx++;
+          }
+        }
+        ctxMain.stroke();
+      }
+
+      function getXYFromMapIdx(idx) {
+        //x = i % width;    // % is the "modulo operator", the remainder of i / width;
+        //y = i / width;    // where "/" is an integer division
+        const width = Math.ceil(img.width / tileWidth);
+        let x = Math.floor(idx % width);
+        let y = Math.floor(idx / width);
+        console.log(idx, "x:" + x + ", y:" + y);
+        return { x: x * tileWidth, y: y * tileHeight };
+      }
+
+      function drawTile(mapIdx) {
+        let coords = getXYFromMapIdx(mapIdx);
+        ctxMain.drawImage(tiles[csv[mapIdx]].image, coords.x, coords.y);
+      }
+      function rebuildImage() {
+        ctxMain.clearRect(0, 0, canvasMain.width, canvasMain.height);
+        const width = Math.ceil(img.width / tileWidth);
+        for (let i = 0; i < csv.length; i++) {
+          try {
+            drawTile(i);
+          } catch (e) {
+            console.log(i, csv.length);
+            console.log("error");
+          }
+        }
+      }
+    </script>
+  </body>
+</html>
