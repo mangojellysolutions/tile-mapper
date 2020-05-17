@@ -77,6 +77,8 @@
     <script>
       const tileWidth = 64;
       const tileHeight = 64;
+      const tilesAcross = 13;
+      const tilesDown = 27;
       const tileDiv = document.getElementById("tileDiv");
       const csvTextBox = document.getElementById("mapCSV");
       const primaryTileImg = document.getElementById("primaryTileImg");
@@ -95,6 +97,7 @@
       function download() {
         let image = tileSheetCanvas.toDataURL("image/png").replace("image/png", "image/octet-stream");
         activateDownload('tilesheet.png', image);
+        
         downloadText(csvTextBox);
       }
 
@@ -345,7 +348,29 @@
             idx++;
           }
         }
-        csvTextBox.value = csv;
+        //csvTextBox.value = csv;
+
+        let csvLine = '';
+        let i=0;
+       
+          for(let y=0;y<tilesDown;y++){
+            let csvText = null;
+            for(let x=0; x<tilesAcross;x++){
+              if(csvText == null){
+                csvText+=csv[i];
+              } else {
+                csvText+=','+csv[i];
+                if (tilesAcross-1 == x){
+                  console.log(x, 'line break ----dance')
+                  csvText+='\n';
+                }
+              }
+              i++;
+            }
+            csvLine +=csvText;
+          }
+        
+        csvTextBox.value = csvLine;
 
         //Build the tile sheets
         tileSheetCanvas.width = tileWidth * tiles.length;
