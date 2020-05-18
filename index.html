@@ -2,8 +2,54 @@
 <html>
   <head>
     <style>
+      body{
+        font-family: Arial, Helvetica, sans-serif;
+      }
+      .propertiesPane{
+        background-color: rgb(255, 255, 255);
+      }
+      input[type=text] {
+        width: 100%;
+        border-style: none;
+      }
+      .propertiesPane > table {
+        border-spacing: 0px;
+      }
+      .propertiesPane  td {
+        padding: 5px;
+        border-bottom: solid 1px rgb(204, 204, 204);
+      }
+      .tilePane {
+        background-color: rgb(255, 255, 255);
+        padding: 5px;
+      }
+      .tileMergePane{
+        background-color: rgb(255, 255, 255);
+        padding: 5px;
+      }
       .item1 {
         grid-area: header;
+        font-weight: bold;
+        background-color: rgb(155, 155, 155);
+        border-bottom: solid 1px rgb(116, 116, 116);
+        padding: 10px 10px;
+      }
+      .item1a {
+        grid-area: header2;
+        font-weight: bold;
+        font-size: 32px;
+        border-bottom: solid 1px white;
+        background-color: rgb(202, 202, 202);
+        color: rgb(138, 136, 136);
+        padding: 10px 10px;
+      }
+      img {
+        vertical-align:middle;
+        width:32px; 
+        height:32px;
+      }
+      .item1a > a {
+        vertical-align:middle;
       }
       .item3 {
         grid-area: left;
@@ -17,13 +63,13 @@
       .thumb-container {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-        background-color: #2196f3;
-        padding: 5px;
+        background-color: #c9d3dc;
+        margin: 5px;
       }
       .thumb-item {
         background-color: rgba(255, 255, 255, 0.8);
         border: 1px solid rgba(0, 0, 0, 0.8);
-        padding: 20px;
+        padding: 10px;
         font-size: 30px;
         text-align: center;
       }
@@ -31,35 +77,88 @@
         display: grid;
         grid-template-areas:
           "header header header header header header"
+          "header2 header2 header2 header2 header2 header2"
           "left right right right right right"
           "footer footer footer footer footer footer";
-        grid-gap: 10px;
-        background-color: #2196f3;
-        padding: 10px;
+        grid-gap: 1px;
+        background-color: #36393b;
       }
 
       .grid-container > div {
-        background-color: rgba(255, 255, 255, 0.8);
-        text-align: center;
-        padding: 0px 0;
+        text-align: left;
       }
     </style>
   </head>
   <body>
     <div class="grid-container">
       <div class="item1">
-        <h1>Tile Mapper</h1>
+        File | Edit | View | Map | Help
+      </div>
+      <!-- https://icons8.com/icon/set/layer/dusk -->
+      <div class="item1a">
+        <div style="float:left">
+       ||
+       <a href="#" onclick="new()"><img src="./icons/new.png"/></a>
+       <a href="#" onclick="open()"><img src="./icons/open.png"/></a>
+       <a href="#" onclick="save()"><img src="./icons/save.png"/></a>
+       &nbsp;
+       |
+       <a href="#" onclick="undo()"><img src="./icons/undo.png"  /></a>
+       <a href="#" onclick="redo()"><img src="./icons/redo.png"  /></a>
+       &nbsp;
+       |
+       <a href="#" onclick="mergeTiles()"><img src="./icons/merge.png"  /></a>
+       &nbsp;
+       |
+       <a href="#" onclick="bush()"><img src="./icons/brush.png"  /></a>
+       <a href="#" onclick="fill()"><img src="./icons/fill.png"  /></a>
+       <a href="#" onclick="erase()"><img src="./icons/eraser.png"  /></a>
+       &nbsp;
+       |
+       <a href="#" onclick="select()"><img src="./icons/select.png"  /></a>
+       <a href="#" onclick="selectSame()"><img src="./icons/selectsame.png"  /></a>
+       &nbsp;
+       |
+       <a href="#" onclick="flip('h')"><img src="./icons/fliphorizontal.png"  /></a>
+       <a href="#" onclick="flip('v')"><img src="./icons/flipvertical.png"  /></a>
+       <a href="#" onclick="rotate('l')"><img src="./icons/rotateleft.png"  /></a>
+       <a href="#" onclick="rotate('r')"><img src="./icons/rotateright.png"  /></a>
+       &nbsp;
+       ||
+       <a href="#" onclick="showHideGrid()"><img src="./icons/grid.png"  /></a>
+       &nbsp;&nbsp;
+       </div>
+       <div style="float:right">
+        <a href="#" onclick="downloadIt()"><img src="./icons/download.png"  /></a>
+        <a href="#" onclick="getTiles()"><img src="./icons/build.png"  /></a>
+       </div>
       </div>
       <div class="item3">
+        <div class="propertiesPane">
+          <table>
+            <tr><td><strong>Property</strong></td><td><strong>Value</strong></td></tr>
+            <tr><td>Orientation</td><td><input type="text" value="Orthogonal"/></td></tr>
+            <tr><td>Tile Width</td><td><input type="text" value="64"/></td></tr>
+            <tr><td>Tile Height</td><td><input type="text" value="64"/></td></tr>
+            <tr><td>Map Width</td><td><input type="text" value="800"/></td></tr>
+            <tr><td>Map Height</td><td><input type="text" value="600"/></td></tr>
+            <tr><td>Background</td><td><input type="text" value="RGB"/></td></tr>
+          </table>
+        </div>
+        <div class="tileMergePane">
+          <img id="primaryTileImg" src="./icons/question-mark.png" /> <img src="./icons/plus.png" /> <img id="secondaryTileImg" src="./icons/question-mark.png" /> <br />
+        </div>
+        <div class="tilePane">
+        <strong>Tile Set</strong>
+          <div id="tileDiv" style="width:275px; height:250px; overflow: scroll;"><canvas id="tileSheetCanvas" width="50" height="64"></canvas></div>
+        </div>
         <div class="thumb-container">
           <div class="thumb-item">
-            <img id="primaryTileImg" src="test.png" /> -> <img id="secondaryTileImg" src="test.png" /> <br />
-            <button onclick="mergeTiles()">Merge</button>
+            1
           </div>
-          <div class="thumb-item"><button onclick=" getTiles()">Rebuild</button></div>
-          <div class="thumb-item"><button onclick="showHideGrid()">Show/Hide Grid</button></div>
+         
           <div class="thumb-item">
-              <button type="button" onClick="download()">Download</button>
+             2
           </div>
           <div class="thumb-item">7</div>
           <div class="thumb-item">8</div>
@@ -68,7 +167,7 @@
       </div>
       <div class="item4"><canvas id="canvas" width="800" height="600"></canvas></div>
       <div id="tileDiv" class="item5">
-        <div id="tileDiv" style="width: 800px; overflow: scroll;"><canvas id="tileSheetCanvas" width="800" height="64"></canvas></div>
+      
         <div id="mapCSVDiv">
           <textarea style="width: 800px; height: 100px;" id="mapCSV"></textarea>
         </div>
@@ -77,8 +176,7 @@
     <script>
       const tileWidth = 64;
       const tileHeight = 64;
-      const tilesAcross = 13;
-      const tilesDown = 27;
+     
       const tileDiv = document.getElementById("tileDiv");
       const csvTextBox = document.getElementById("mapCSV");
       const primaryTileImg = document.getElementById("primaryTileImg");
@@ -89,12 +187,14 @@
       let showGrid = false;
       let tiles = [];
       let csv = [];
+      let tilesAcross = 0;
+      let tilesDown = 0;
       let img = new Image();
       const canvasMain = document.getElementById("canvas");
       const tileSheetCanvas = document.getElementById("tileSheetCanvas");
       const tileSheetCtx = tileSheetCanvas.getContext("2d");
 
-      function download() {
+      function downloadIt() {
         let image = tileSheetCanvas.toDataURL("image/png").replace("image/png", "image/octet-stream");
         activateDownload('tilesheet.png', image);
         
@@ -250,6 +350,8 @@
       img.onload = () => {
         canvasMain.width = img.width;
         canvasMain.height = img.height;
+        tilesAcross = Math.floor(img.width/tileWidth);
+        tilesDown = Math.floor(img.height/tileHeight);
         ctxMain.drawImage(img, 0, 0, img.width, img.height);
         setTimeout(getTiles, 1000);
       };
