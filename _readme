@@ -1,0 +1,9 @@
+npm uninstall vue-cli -g
+cd C:\dev\TileMapper>
+npm install -g @vue/cli
+vue --version
+npm update -g @vue/cli
+vue create tiller
+highlight default and press enter
+cd tiller
+npm run serve
