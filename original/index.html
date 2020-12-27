@@ -435,8 +435,6 @@
 
         if (!match) {
           tiles.push({ image: newImage, base64: base64 });
-          // tileDiv.appendChild(newImage);
-          // document.getElementById('tileDiv').appendChild(newImage);
           return idx++;
         } else {
           return idx;
@@ -530,6 +528,7 @@
         ctxMain.drawImage(tiles[csv[mapIdx]].image, coords.x, coords.y);
       }
       function rebuildImage() {
+        console.log("rebuildImage")
         ctxMain.clearRect(0, 0, canvasMain.width, canvasMain.height);
         const width = Math.ceil(img.width / tileWidth);
         for (let i = 0; i < csv.length; i++) {
